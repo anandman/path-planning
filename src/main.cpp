@@ -72,7 +72,9 @@ int main() {
   	iss >> s;
   	iss >> d_x;
   	iss >> d_y;
-  	map_waypoints.push_back({.x = x,.y = y,.s = s,.dx = d_x,.dy = d_y});
+  	//map_waypoints.push_back({.x = x,.y = y,.s = s,.dx = d_x,.dy = d_y});
+    // reviewer's compiler doesn't support C++17 and designated initializers
+    map_waypoints.push_back({s, x, y, d_x, d_y});
   }
 
   int tgt_lane = -1;

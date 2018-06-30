@@ -150,6 +150,7 @@ vector<double> getXY(double s, double d, const vector<Waypoint> &wpts)
 
 }
 
+/* UNUSED
 // given a set of waypoints, return a set of interpolated waypoints at every distance dist
 vector<Waypoint> getInterpolatedWaypoints(const vector<Waypoint> &wpts, double max_s, double dist)
 {
@@ -194,5 +195,6 @@ vector<Waypoint> getInterpolatedWaypoints(const vector<Waypoint> &wpts, double m
 
   return intp_wpts;
 }
+*/
 
 #endif //WAYPOINT
