@@ -141,9 +141,11 @@ int main() {
           cout.precision(2);                      // for fixed format, two decimal places
           cout << "\rtotal distance driven: " << setw(5) << (total_distance/(5280 * 12 * 0.0254)) << " miles" << flush;
 
+          // guess car's target lane (+0.5 is to ensure proper rounding before casting)
+          int current_lane = (int)(car_d - 2 + 0.5) / 4;
           if (tgt_lane < 0) {
-            // guess car's target lane (+0.5 is to ensure proper rounding before casting)
-            tgt_lane = (int)(car_d - 2 + 0.5) / 4;
+            // handle startup condition
+            tgt_lane = current_lane;
           }
 
           // target speed in mph (goal is to ensure we are below speed limit of 50mph)
@@ -157,7 +159,7 @@ int main() {
           //cout << "prev path size: " << previous_path_size << endl;
           //cout << "prev path X: " << previous_path_x << endl;
           //cout << "prev path Y: " << previous_path_y << endl;
-          //cout << "target lane: " << tgt_lane << endl;
+          //cout << "current/target lane: " << current_lane << "/" << tgt_lane << endl;
           //cout << "end S/D: " << end_path_s << ", " << end_path_d << endl;
           //cout << "car X/Y/S/D/Y: " << car_x << ", " << car_y << ", " << car_s << ", " << car_d << ", " << car_yaw << endl;
 
@@ -177,12 +179,13 @@ int main() {
           //cout << "car speed: " << miph2mps(car_speed) << " m/s" << endl;
 
           // calculate safe following distance as one car length for every 10mph we're driving
-          double safe_distance = (car_speed / 10) * CAR_LENGTH;
+          double safe_distance = ((int)(mps2miph(car_speed) / 10) + 1) * CAR_LENGTH * 0.5;
+          double too_close_distance = safe_distance * 0.667;
           double closest_distance = 1000;
           bool pass_traffic = false;
           bool traffic_on_left = false;
           bool traffic_on_right = false;
-          //cout << "safe distance: " << safe_distance << endl;
+          //cout << "safe/too close distance: " << safe_distance << "/" << too_close_distance << endl;
 
           // scan other cars around us
           for (int i=0; i < sensor_fusion.size(); i++) {
@@ -198,32 +201,36 @@ int main() {
 
             // TODO: we really should go slower than traffic on our left, but leave that for version 2.0
             // check if traffic is in same lane
-            if ((traffic_d > tgt_lane*4) && (traffic_d < tgt_lane*4+4)) {
+            if ((traffic_d > current_lane*4) && (traffic_d < current_lane*4+4)) {
               // check if traffic in front of us is within safe following distance
               //cout << "traffic " << traffic_id << " in same lane (d=" << traffic_d << "): " << traffic_distance << "m ahead of us traveling at " << traffic_speed << "m/s" << endl;
               if ((traffic_distance > 0) && (traffic_distance <= safe_distance) && (traffic_distance < closest_distance)) {
-                //cout << "found traffic " << traffic_id << " within safe distance traveling at " << traffic_speed << "mph" << endl;
+                //cout << "found traffic " << traffic_id << " within safe distance traveling at " << traffic_speed << "m/s" << endl;
                 // set safe distance to this traffic's distance so that we can see if there are any others even closer
                 closest_distance = traffic_distance;
 
                 // set ref speed to traffic in front of us
                 ref_v = miph2mps(traffic_speed);
+                // slow down as we get even closer
+                if (traffic_distance <= too_close_distance) {
+                  ref_v -= 5;
+                }
                 pass_traffic = true;
               }
             }
 
             // check if traffic is present in lane to left
-            if ((tgt_lane > 0) && (traffic_d > (tgt_lane-1)*4) && (traffic_d < (tgt_lane-1)*4+4)) {
+            if ((current_lane > 0) && (traffic_d > (current_lane-1)*4) && (traffic_d < (current_lane-1)*4+4)) {
               // TODO: use traffic's speed/acceleration instead of using safe distance for traffic "behind" us
-              if ((traffic_distance > -safe_distance) && (traffic_distance < safe_distance)) {
+              if ((traffic_distance > -too_close_distance) && (traffic_distance < safe_distance)) {
                 traffic_on_left = true;
               }
             }
 
             // check if traffic is present in lane to right
-            if ((tgt_lane < 2) && (traffic_d > (tgt_lane+1)*4) && (traffic_d < (tgt_lane+1)*4+4)) {
+            if ((current_lane < 2) && (traffic_d > (current_lane+1)*4) && (traffic_d < (current_lane+1)*4+4)) {
               // TODO: use traffic's speed/acceleration instead of using safe distance for traffic "behind" us
-              if ((traffic_distance > -safe_distance) && (traffic_distance < safe_distance)) {
+              if ((traffic_distance > -too_close_distance) && (traffic_distance < safe_distance)) {
                 traffic_on_right = true;
               }
             }
@@ -232,15 +239,17 @@ int main() {
             // TODO: need to check and recover if traffic we are passing slows down
           }
 
-          // pass traffic if too slow in front of us or change lanes to the right if we're in the passing lane
-          if (pass_traffic || tgt_lane == 0) {
-            if (!traffic_on_left && tgt_lane > 0) {
+          // pass traffic if too slow in front of us
+          // don't initiate a pass if we're already doing one (ie, tgt_lane != current_lane)
+          // TODO: change lanes to the right if we're in the passing lane
+          if (pass_traffic && tgt_lane == current_lane) {
+            if (!traffic_on_left && current_lane > 0) {
               // pass on left
-              tgt_lane -= 1;
-            } else if (!traffic_on_right && tgt_lane < 2) {
+              tgt_lane = current_lane - 1;
+            } else if (!traffic_on_right && current_lane < 2) {
               // pass on right
               // TODO: really shouldn't do this but the other cars suck and go slowly everywhere
-              tgt_lane += 1;
+              tgt_lane = current_lane + 1;
             }
           }
 
