@@ -228,7 +228,8 @@ int main() {
               }
             }
 
-            // TODO: need to check and recover if traffic we are passing changes into our new target la
+            // TODO: need to check and recover if traffic we are passing changes into our new target lane
+            // TODO: need to check and recover if traffic we are passing slows down
           }
 
           // pass traffic if too slow in front of us or change lanes to the right if we're in the passing lane
